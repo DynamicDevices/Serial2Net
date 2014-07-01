@@ -1,0 +1,29 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 11.00
+# Visual Studio 2010
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Serial2Net", "Serial2Net\Serial2Net.csproj", "{5C46A923-4066-4CE8-89F2-3BAC47BF83ED}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{D4F3A62F-5BF5-44AE-A9D4-DC4683AE71E2}"
+	ProjectSection(SolutionItems) = preProject
+		LICENSE = LICENSE
+		README.md = README.md
+	EndProjectSection
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|x86 = Debug|x86
+		Release|x86 = Release|x86
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{5C46A923-4066-4CE8-89F2-3BAC47BF83ED}.Debug|x86.ActiveCfg = Debug|x86
+		{5C46A923-4066-4CE8-89F2-3BAC47BF83ED}.Debug|x86.Build.0 = Debug|x86
+		{5C46A923-4066-4CE8-89F2-3BAC47BF83ED}.Release|x86.ActiveCfg = Release|x86
+		{5C46A923-4066-4CE8-89F2-3BAC47BF83ED}.Release|x86.Build.0 = Release|x86
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		VisualSVNWorkingCopyRoot = .
+	EndGlobalSection
+EndGlobal
