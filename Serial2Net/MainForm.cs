@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Diagnostics;
+using System.IO;
 using System.IO.Ports;
+using System.Net;
 using System.Windows.Forms;
 using System.Net.Sockets;
 using PortListener.Core.Utilities;
@@ -11,7 +13,9 @@ namespace Serial2Net
     {
         private delegate void LogHandler(string text);
 
-        private TcpClient _connection;
+        private TcpClient _client;
+        private TcpListener _server;
+
         private SerialPort _port;
         private NetworkStream _stream;
         private readonly byte[] _tcpdata = new byte[1024];
@@ -19,6 +23,14 @@ namespace Serial2Net
         private bool _bAutoReconnect;
         private bool _bDisplayHex;
         private bool _bIsRunning;
+
+        enum ConnectionMode
+        {
+            CLIENT,
+            SERVER,
+        }
+
+        private ConnectionMode _eConnectionMode = ConnectionMode.CLIENT;
 
         public MainForm()
         {
@@ -34,6 +46,8 @@ namespace Serial2Net
                 comboBoxSerialPort.SelectedIndex = 0;
 
             comboBoxBaudRate.SelectedIndex = 7;
+
+            radioButtonClient.Checked = true;
 
             _bAutoReconnect = checkBoxReconnect.Checked;
             _bDisplayHex = checkBoxDisplayHex.Checked;
@@ -57,14 +71,27 @@ namespace Serial2Net
 
                 try
                 {
-                    Log("Connecting to " + textBoxIPAddress.Text + ":" + textBoxTargetPort.Text);
+                    if (_eConnectionMode == ConnectionMode.CLIENT)
+                    {
+                        Log("Connecting to " + textBoxIPAddress.Text + ":" + textBoxTargetPort.Text);
 
-                    _connection = new TcpClient();
-                    _connection.BeginConnect(textBoxIPAddress.Text, int.Parse(textBoxTargetPort.Text), TcpConnected, null);
+                        _client = new TcpClient();
+                        _client.BeginConnect(textBoxIPAddress.Text, int.Parse(textBoxTargetPort.Text), TcpConnectedOut,
+                                                 null);
+                    }
+                    else
+                    {
+                        _server = new TcpListener(IPAddress.Any, int.Parse(textBoxTargetPort.Text));
+                        _server.Start();
+                        _server.BeginAcceptTcpClient(TcpConnectedIn, null);
+                    }
                 }
-                catch (Exception)
+                catch (Exception ex)
                 {
-                    Log("Couldn't connect");
+                    if(_eConnectionMode == ConnectionMode.CLIENT)   
+                        Log("Couldn't connect: " + ex.Message);
+                    else
+                        Log("Couldn't listen: " + ex.Message);
 
                     _port.DataReceived -= PortDataReceived;
                     _port.Close();
@@ -76,24 +103,55 @@ namespace Serial2Net
             }
             else
             {
-                if(_port.IsOpen)
+                if (_port.IsOpen)
                     _port.Close();
 
-                if(_connection.Connected)
-                    _connection.Close();
+                if (_client != null)
+                {
+                    if (_client.Connected)
+                        _client.Close();
+                    _client = null;
+                }
+
+                if(_server != null)
+                {
+                    _server.Stop();
+//                    _server = null;
+                }
 
                 buttonStartStop.Text = @"Start";
                 _bIsRunning = false;
             }              
         }
 
-        void TcpConnected(IAsyncResult result)
+        void TcpConnectedIn(IAsyncResult result)
         {
             try
             {
-                _connection.EndConnect(result);
+                _client = _server.EndAcceptTcpClient(result);
 
-                _stream = _connection.GetStream();
+                _stream = _client.GetStream();
+
+                Log("Client Connected from: " + _client.Client.RemoteEndPoint);
+
+                var tcpdata = new byte[1024];
+                _stream.BeginRead(tcpdata, 0, tcpdata.Length, TcpReader, null);
+            } catch(Exception e)
+            {
+                if(e is ObjectDisposedException)
+                    Log("Server shutdown");
+                else
+                    Log("Server exception: " + e.Message);
+            }
+        }
+
+        void TcpConnectedOut(IAsyncResult result)
+        {
+            try
+            {
+                _client.EndConnect(result);
+
+                _stream = _client.GetStream();
 
                 Log("Connected");
 
@@ -104,10 +162,14 @@ namespace Serial2Net
             {
                 Log("Couldn't connect: " + e.Message);
 
-                if (_bAutoReconnect && _bIsRunning)
+                if (_eConnectionMode == ConnectionMode.CLIENT)
                 {
-                    Log("Connecting to " + textBoxIPAddress.Text + ":" + textBoxTargetPort.Text);
-                    _connection.BeginConnect(textBoxIPAddress.Text, int.Parse(textBoxTargetPort.Text), TcpConnected, null);
+                    if (_bAutoReconnect && _bIsRunning)
+                    {
+                        Log("Connecting to " + textBoxIPAddress.Text + ":" + textBoxTargetPort.Text);
+                        _client.BeginConnect(textBoxIPAddress.Text, int.Parse(textBoxTargetPort.Text), TcpConnectedOut,
+                                                 null);
+                    }
                 }
             }
         }
@@ -139,13 +201,17 @@ namespace Serial2Net
                         {
                             _stream.Close();
                         } catch{}
+
                         _stream = null;
                         if (_bAutoReconnect && _bIsRunning)
                         {
-                            Log("Connecting to " + textBoxIPAddress.Text + ":" + textBoxTargetPort.Text);
+                            if (_eConnectionMode == ConnectionMode.CLIENT)
+                            {
+                                Log("Connecting to " + textBoxIPAddress.Text + ":" + textBoxTargetPort.Text);
 
-                            _connection.BeginConnect(textBoxIPAddress.Text, int.Parse(textBoxTargetPort.Text), TcpConnected, null);
-
+                                _client.BeginConnect(textBoxIPAddress.Text, int.Parse(textBoxTargetPort.Text),
+                                                         TcpConnectedOut, null);
+                            }
                         }
                     }
                 }
@@ -174,7 +240,12 @@ namespace Serial2Net
                 }
             } catch(Exception e)
             {
-                Log("Exception: " + e.Message);
+                if (e is ObjectDisposedException)
+                    Log("Connection closed");
+                else if(e is IOException && e.Message.Contains("closed"))
+                    Log("Connection closed");
+                else
+                    Log("Exception: " + e.Message);
 
                 try
                 {
@@ -187,19 +258,28 @@ namespace Serial2Net
                 {
                     try
                     {
-                        Log("Connecting to " + textBoxIPAddress.Text + ":" + textBoxTargetPort.Text);
-
                         try
                         {
-                            _connection.Close();
+                            _client.Close();
                         } catch
                         {
                         }
 
-                        _connection = new TcpClient();
+                        if (_eConnectionMode == ConnectionMode.CLIENT)
+                        {
+                            Log("Connecting to " + textBoxIPAddress.Text + ":" + textBoxTargetPort.Text);
+                            
+                            _client = new TcpClient();
 
-                        _connection.BeginConnect(textBoxIPAddress.Text, int.Parse(textBoxTargetPort.Text), TcpConnected,
-                                                 null);
+                            _client.BeginConnect(textBoxIPAddress.Text, int.Parse(textBoxTargetPort.Text),
+                                                     TcpConnectedOut,
+                                                     null);
+                        }
+                        else
+                        {
+                            _server.BeginAcceptTcpClient(TcpConnectedIn, null);
+                        }
+
                     } catch(Exception ex)
                     {
                         Log("Problem reconnecting:" + ex.Message);
@@ -243,6 +323,21 @@ namespace Serial2Net
         private void ButtonClearClick(object sender, EventArgs e)
         {
             textBoxLog.Text = "";
+        }
+
+        private void RadioButtonServerCheckedChanged(object sender, EventArgs e)
+        {
+
+            if(radioButtonServer.Checked)
+            {
+                _eConnectionMode = ConnectionMode.SERVER;
+                textBoxIPAddress.Enabled = false;
+            }
+            else
+            {
+                _eConnectionMode = ConnectionMode.CLIENT;
+                textBoxIPAddress.Enabled = true;                
+            }
         }
     }
 }
