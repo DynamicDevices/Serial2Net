@@ -1,13 +1,7 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.ComponentModel;
-using System.Data;
 using System.Diagnostics;
-using System.Drawing;
 using System.IO.Ports;
-using System.Text;
 using System.Windows.Forms;
-using System.Net;
 using System.Net.Sockets;
 using PortListener.Core.Utilities;
 
@@ -20,51 +14,65 @@ namespace Serial2Net
         private TcpClient _connection;
         private SerialPort _port;
         private NetworkStream _stream;
-        private byte[] _tcpdata = new byte[1024];
+        private readonly byte[] _tcpdata = new byte[1024];
+
+        private bool _bAutoReconnect;
+        private bool _bDisplayHex;
+        private bool _bIsRunning;
 
         public MainForm()
         {
             InitializeComponent();
 
-            string[] arrPorts = SerialPort.GetPortNames();
+            Text += " v" + System.Reflection.Assembly.GetEntryAssembly().GetName().Version;
+
+            var arrPorts = SerialPort.GetPortNames();
             comboBoxSerialPort.Items.Clear();
             foreach (var port in arrPorts)
                 comboBoxSerialPort.Items.Add(port);
             if (arrPorts.Length > 0)
                 comboBoxSerialPort.SelectedIndex = 0;
 
-            comboBoxBaudRate.SelectedIndex = 4;
+            comboBoxBaudRate.SelectedIndex = 7;
+
+            _bAutoReconnect = checkBoxReconnect.Checked;
+            _bDisplayHex = checkBoxDisplayHex.Checked;
         }
 
-        private void buttonStartStop_Click(object sender, EventArgs e)
+        private void ButtonStartStopClick(object sender, EventArgs e)
         {
-            if(buttonStartStop.Text == "Start")
-            {
+            if (!_bIsRunning)
+            {                
                 try
                 {
                     _port = new SerialPort((string)comboBoxSerialPort.SelectedItem, int.Parse((string)comboBoxBaudRate.SelectedItem), Parity.None, 8, StopBits.One);
-                    _port.DataReceived += new SerialDataReceivedEventHandler(_port_DataReceived);
-                    _port.ReceivedBytesThreshold = 8;                    
+                    _port.DataReceived += PortDataReceived;
+                    _port.ReceivedBytesThreshold = 1;                    
                     _port.Open();
-                } catch(Exception ex)
+                } catch(Exception)
                 {
-                    MessageBox.Show("Couldn't open port " + (string) comboBoxSerialPort.SelectedItem);
+                    MessageBox.Show(@"Couldn't open port " + (string) comboBoxSerialPort.SelectedItem);
                     return;
                 }
 
                 try
                 {
-                    _connection = new TcpClient(textBoxIPAddress.Text, int.Parse(textBoxTargetPort.Text));
-                    _stream = _connection.GetStream();
-                    byte[] tcpdata = new byte[1024];
-                    _stream.BeginRead(tcpdata, 0, tcpdata.Length, new AsyncCallback(TcpReader), null);
+                    Log("Connecting to " + textBoxIPAddress.Text + ":" + textBoxTargetPort.Text);
+
+                    _connection = new TcpClient();
+                    _connection.BeginConnect(textBoxIPAddress.Text, int.Parse(textBoxTargetPort.Text), TcpConnected, null);
                 }
-                catch (Exception ex)
+                catch (Exception)
                 {
-                    MessageBox.Show("Couldn't connect to " + textBoxTargetPort.Text + ":" + textBoxIPAddress.Text);
+                    Log("Couldn't connect");
+
+                    _port.DataReceived -= PortDataReceived;
+                    _port.Close();
+
                     return;
                 }
-                buttonStartStop.Text = "Stop";
+                buttonStartStop.Text = @"Stop";
+                _bIsRunning = true;
             }
             else
             {
@@ -74,34 +82,129 @@ namespace Serial2Net
                 if(_connection.Connected)
                     _connection.Close();
 
-                buttonStartStop.Text = "Start";               
+                buttonStartStop.Text = @"Start";
+                _bIsRunning = false;
             }              
         }
 
-        void _port_DataReceived(object sender, SerialDataReceivedEventArgs e)
+        void TcpConnected(IAsyncResult result)
         {
-            int rxlen = _port.BytesToRead;
-            byte[] data = new byte[rxlen];
+            try
+            {
+                _connection.EndConnect(result);
+
+                _stream = _connection.GetStream();
+
+                Log("Connected");
+
+                var tcpdata = new byte[1024];
+                _stream.BeginRead(tcpdata, 0, tcpdata.Length, TcpReader, null);
+
+            } catch(Exception e)
+            {
+                Log("Couldn't connect: " + e.Message);
+
+                if (_bAutoReconnect && _bIsRunning)
+                {
+                    Log("Connecting to " + textBoxIPAddress.Text + ":" + textBoxTargetPort.Text);
+                    _connection.BeginConnect(textBoxIPAddress.Text, int.Parse(textBoxTargetPort.Text), TcpConnected, null);
+                }
+            }
+        }
+
+        void PortDataReceived(object sender, SerialDataReceivedEventArgs e)
+        {
+            var rxlen = _port.BytesToRead;
+            var data = new byte[rxlen];
             _port.Read(data, 0, rxlen);
 
-            Log("S->N: " + StringHelper.ToHexString(data, 0, rxlen));
+            var line = _bDisplayHex ? StringHelper.ToHexString(data, 0, rxlen) : System.Text.Encoding.ASCII.GetString(data, 0, rxlen);
+            if (line.EndsWith("\r\n"))
+                line = line.Substring(0, line.Length - 2);
 
-            _stream.Write(data, 0, rxlen);
-        }
+            Log("S->N: " + line);
+
+            if(_stream != null)
+                if(_stream.CanWrite)
+                {
+                    try
+                    {
+                        _stream.Write(data, 0, rxlen);
+                    }
+                    catch(Exception ex)
+                    {
+                        Log("Can't write to TCP stream:" + ex.Message);
+
+                        try
+                        {
+                            _stream.Close();
+                        } catch{}
+                        _stream = null;
+                        if (_bAutoReconnect && _bIsRunning)
+                        {
+                            Log("Connecting to " + textBoxIPAddress.Text + ":" + textBoxTargetPort.Text);
+
+                            _connection.BeginConnect(textBoxIPAddress.Text, int.Parse(textBoxTargetPort.Text), TcpConnected, null);
+
+                        }
+                    }
+                }
+                }
 
         void TcpReader(IAsyncResult ar)
         {
-            int rxbytes = _stream.EndRead(ar);
-
-            if (rxbytes > 0)
+            try
             {
-                _port.Write(_tcpdata, 0, rxbytes);
-                Log("N->S: " + StringHelper.ToHexString(_tcpdata, 0, rxbytes));
-            }
+                var rxbytes = _stream.EndRead(ar);
 
-            if (rxbytes >= 0)
+                if (rxbytes > 0)
+                {
+                    _port.Write(_tcpdata, 0, rxbytes);
+
+                    var line = _bDisplayHex ? StringHelper.ToHexString(_tcpdata, 0, rxbytes) : System.Text.Encoding.ASCII.GetString(_tcpdata, 0, rxbytes);
+                    if (line.EndsWith("\r\n"))
+                        line = line.Substring(0, line.Length - 2);
+
+                    Log("N->S: " + line);
+                }
+
+                if (rxbytes >= 0)
+                {
+                    _stream.BeginRead(_tcpdata, 0, _tcpdata.Length, TcpReader, null);
+                }
+            } catch(Exception e)
             {
-                _stream.BeginRead(_tcpdata, 0, _tcpdata.Length, new AsyncCallback(TcpReader), null);
+                Log("Exception: " + e.Message);
+
+                try
+                {
+                    _stream.Close();
+                }
+                catch { }
+                _stream = null;
+
+                if (_bAutoReconnect && _bIsRunning)
+                {
+                    try
+                    {
+                        Log("Connecting to " + textBoxIPAddress.Text + ":" + textBoxTargetPort.Text);
+
+                        try
+                        {
+                            _connection.Close();
+                        } catch
+                        {
+                        }
+
+                        _connection = new TcpClient();
+
+                        _connection.BeginConnect(textBoxIPAddress.Text, int.Parse(textBoxTargetPort.Text), TcpConnected,
+                                                 null);
+                    } catch(Exception ex)
+                    {
+                        Log("Problem reconnecting:" + ex.Message);
+                    }
+                }
             }
         }
 
@@ -109,16 +212,37 @@ namespace Serial2Net
         {
             if(InvokeRequired)
             {
-                this.Invoke(new LogHandler(Log), new object[] {text});
+                Invoke(new LogHandler(Log), new object[] {text});
                 return;
             }
+
+            // Truncate
+            if (textBoxLog.Text.Length > 4096)
+                textBoxLog.Text = textBoxLog.Text.Substring(textBoxLog.Text.Length - 4096);
+
             textBoxLog.Text += text + "\r\n";
             textBoxLog.SelectionStart = textBoxLog.Text.Length - 1;
+            textBoxLog.ScrollToCaret();
         }
 
-        private void linkLabel1_LinkClicked(object sender, LinkLabelLinkClickedEventArgs e)
+        private void LinkLabel1LinkClicked(object sender, LinkLabelLinkClickedEventArgs e)
         {
             Process.Start("http://www.dynamicdevices.co.uk");
+        }
+
+        private void CheckBoxReconnectCheckedChanged(object sender, EventArgs e)
+        {
+            _bAutoReconnect = checkBoxReconnect.Checked;
+        }
+
+        private void CheckBoxDisplayHexCheckedChanged(object sender, EventArgs e)
+        {
+            _bDisplayHex = checkBoxDisplayHex.Checked;
+        }
+
+        private void ButtonClearClick(object sender, EventArgs e)
+        {
+            textBoxLog.Text = "";
         }
     }
 }
