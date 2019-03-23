@@ -7,6 +7,7 @@ using System.Windows.Forms;
 using System.Net.Sockets;
 using PortListener.Core.Utilities;
 using System.Collections.Generic;
+using System.Configuration;
 
 namespace Serial2Net
 {
@@ -58,6 +59,8 @@ namespace Serial2Net
         private bool _bDisplayHex;
         private bool _bIsRunning;
 
+        private Configuration config;
+
         enum ConnectionMode
         {
             CLIENT,
@@ -85,6 +88,51 @@ namespace Serial2Net
 
             _bAutoReconnect = checkBoxReconnect.Checked;
             _bDisplayHex = checkBoxDisplayHex.Checked;
+
+            try
+            {
+                config = ConfigurationManager.OpenExeConfiguration(ConfigurationUserLevel.None);
+                if (config.AppSettings.Settings["SerialPort"] != null)
+                {
+                    var tmp = config.AppSettings.Settings["SerialPort"].Value;
+                    if (comboBoxSerialPort.Items.Contains(tmp))
+                    {
+                        comboBoxSerialPort.SelectedIndex = comboBoxSerialPort.Items.IndexOf(tmp);
+                    }
+                }
+                
+                if (config.AppSettings.Settings["BaudRate"] != null)
+                {
+                    var tmp = config.AppSettings.Settings["BaudRate"].Value;
+                    if (comboBoxBaudRate.Items.Contains(tmp))
+                    {
+                        comboBoxBaudRate.SelectedIndex = comboBoxBaudRate.Items.IndexOf(tmp);
+                    }
+                }
+                
+                if (config.AppSettings.Settings["tcpPort"] != null)
+                {
+                    var tmp = config.AppSettings.Settings["tcpPort"].Value;
+                    if (tmp != null)
+                    {
+                        textBoxTargetPort.Text = tmp;
+                    }
+                }
+                
+                if (config.AppSettings.Settings["tcpPortRO"] != null)
+                {
+                    var tmp = config.AppSettings.Settings["tcpPortRO"].Value;
+                    if (tmp != null)
+                    {
+                        textBoxReadOnlyPort.Text = tmp;
+                    }
+                }
+                
+            }
+            catch (Exception ex)
+            {
+                Log("read config exception: " + ex.Message);
+            }
 
             radioButtonServer_CheckedChanged_do();
         }
@@ -147,17 +195,55 @@ namespace Serial2Net
             return StopBits.None;
         }
 
+        private void saveAppConfig()
+        {
+            if (config.AppSettings.Settings["SerialPort"] == null)
+            {
+                config.AppSettings.Settings.Add("SerialPort", (string)comboBoxSerialPort.SelectedItem);
+            } else
+            {
+                config.AppSettings.Settings["SerialPort"].Value = (string)comboBoxSerialPort.SelectedItem;
+            }
+
+            if (config.AppSettings.Settings["BaudRate"] == null) {
+                config.AppSettings.Settings.Add("BaudRate", (string)comboBoxBaudRate.SelectedItem);
+            } else
+            {
+                config.AppSettings.Settings["BaudRate"].Value = (string)comboBoxBaudRate.SelectedItem;
+            }
+
+            if (config.AppSettings.Settings["tcpPort"] == null)
+            {
+                config.AppSettings.Settings.Add("tcpPort", textBoxTargetPort.Text);
+            }
+            else
+            {
+                config.AppSettings.Settings["tcpPort"].Value = textBoxTargetPort.Text;
+            }
+
+            if (config.AppSettings.Settings["tcpPortRO"] == null)
+            {
+                config.AppSettings.Settings.Add("tcpPortRO", textBoxReadOnlyPort.Text);
+            }
+            else
+            {
+                config.AppSettings.Settings["tcpPortRO"].Value = textBoxReadOnlyPort.Text;
+            }
+            
+            config.Save(ConfigurationSaveMode.Full);
+            ConfigurationManager.RefreshSection("appSettings");
+        }
         private void ButtonStartStopClick(object sender, EventArgs e)
         {
             if (!_bIsRunning)
             {                
                 try
                 {
-                    _port = new SerialPort(comboBoxSerialPort.SelectedText,
-                        int.Parse(comboBoxBaudRate.SelectedText),
+                    _port = new SerialPort((string)comboBoxSerialPort.SelectedItem,
+                        int.Parse((string)comboBoxBaudRate.SelectedItem),
                         Parity.None,
-                        int.Parse(comboBoxDataBits.SelectedText),
-                        strToStopBits(comboBoxStopBits.SelectedText));
+                        int.Parse((string)comboBoxDataBits.SelectedItem),
+                        strToStopBits((string)comboBoxStopBits.SelectedItem));
                     _port.DataReceived += PortDataReceived;
                     _port.ReceivedBytesThreshold = 1;                    
                     _port.Open();
@@ -204,6 +290,8 @@ namespace Serial2Net
                 }
                 buttonStartStop.Text = @"Stop";
                 _bIsRunning = true;
+
+                saveAppConfig();
             }
             else
             {
@@ -590,5 +678,6 @@ end:
         {
             Process.Start("https://github.com/YeLincoln/Serial2Net");
         }
+
     }
 }

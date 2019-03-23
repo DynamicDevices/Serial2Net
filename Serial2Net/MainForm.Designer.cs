@@ -36,7 +36,11 @@
             this.checkBoxDisplayHex = new System.Windows.Forms.CheckBox();
             this.buttonClear = new System.Windows.Forms.Button();
             this.groupBoxSerialPort = new System.Windows.Forms.GroupBox();
+            this.label5 = new System.Windows.Forms.Label();
+            this.label4 = new System.Windows.Forms.Label();
             this.label1 = new System.Windows.Forms.Label();
+            this.comboBoxStopBits = new System.Windows.Forms.ComboBox();
+            this.comboBoxDataBits = new System.Windows.Forms.ComboBox();
             this.comboBoxBaudRate = new System.Windows.Forms.ComboBox();
             this.labelSerialPort = new System.Windows.Forms.Label();
             this.comboBoxSerialPort = new System.Windows.Forms.ComboBox();
@@ -51,10 +55,6 @@
             this.radioButtonClient = new System.Windows.Forms.RadioButton();
             this.label3 = new System.Windows.Forms.Label();
             this.linkLabel2 = new System.Windows.Forms.LinkLabel();
-            this.comboBoxDataBits = new System.Windows.Forms.ComboBox();
-            this.label4 = new System.Windows.Forms.Label();
-            this.comboBoxStopBits = new System.Windows.Forms.ComboBox();
-            this.label5 = new System.Windows.Forms.Label();
             this.groupBoxSerialPort.SuspendLayout();
             this.groupBox1.SuspendLayout();
             this.SuspendLayout();
@@ -139,6 +139,24 @@
             this.groupBoxSerialPort.TabStop = false;
             this.groupBoxSerialPort.Text = "Serial Port";
             // 
+            // label5
+            // 
+            this.label5.AutoSize = true;
+            this.label5.Location = new System.Drawing.Point(13, 97);
+            this.label5.Name = "label5";
+            this.label5.Size = new System.Drawing.Size(53, 12);
+            this.label5.TabIndex = 12;
+            this.label5.Text = "stopBits";
+            // 
+            // label4
+            // 
+            this.label4.AutoSize = true;
+            this.label4.Location = new System.Drawing.Point(13, 71);
+            this.label4.Name = "label4";
+            this.label4.Size = new System.Drawing.Size(53, 12);
+            this.label4.TabIndex = 12;
+            this.label4.Text = "dataBits";
+            // 
             // label1
             // 
             this.label1.AutoSize = true;
@@ -147,6 +165,31 @@
             this.label1.Size = new System.Drawing.Size(59, 12);
             this.label1.TabIndex = 12;
             this.label1.Text = "Baud Rate";
+            // 
+            // comboBoxStopBits
+            // 
+            this.comboBoxStopBits.FormattingEnabled = true;
+            this.comboBoxStopBits.Items.AddRange(new object[] {
+            "1",
+            "2",
+            "1.5"});
+            this.comboBoxStopBits.Location = new System.Drawing.Point(91, 94);
+            this.comboBoxStopBits.Name = "comboBoxStopBits";
+            this.comboBoxStopBits.Size = new System.Drawing.Size(67, 20);
+            this.comboBoxStopBits.TabIndex = 11;
+            // 
+            // comboBoxDataBits
+            // 
+            this.comboBoxDataBits.FormattingEnabled = true;
+            this.comboBoxDataBits.Items.AddRange(new object[] {
+            "8",
+            "7",
+            "6",
+            "5"});
+            this.comboBoxDataBits.Location = new System.Drawing.Point(91, 68);
+            this.comboBoxDataBits.Name = "comboBoxDataBits";
+            this.comboBoxDataBits.Size = new System.Drawing.Size(67, 20);
+            this.comboBoxDataBits.TabIndex = 11;
             // 
             // comboBoxBaudRate
             // 
@@ -294,49 +337,6 @@
             this.linkLabel2.TabStop = true;
             this.linkLabel2.Text = "YeLincoln";
             this.linkLabel2.LinkClicked += new System.Windows.Forms.LinkLabelLinkClickedEventHandler(this.linkLabel2_LinkClicked);
-            // 
-            // comboBoxDataBits
-            // 
-            this.comboBoxDataBits.FormattingEnabled = true;
-            this.comboBoxDataBits.Items.AddRange(new object[] {
-            "8",
-            "7",
-            "6",
-            "5"});
-            this.comboBoxDataBits.Location = new System.Drawing.Point(91, 68);
-            this.comboBoxDataBits.Name = "comboBoxDataBits";
-            this.comboBoxDataBits.Size = new System.Drawing.Size(67, 20);
-            this.comboBoxDataBits.TabIndex = 11;
-            // 
-            // label4
-            // 
-            this.label4.AutoSize = true;
-            this.label4.Location = new System.Drawing.Point(13, 71);
-            this.label4.Name = "label4";
-            this.label4.Size = new System.Drawing.Size(53, 12);
-            this.label4.TabIndex = 12;
-            this.label4.Text = "dataBits";
-            // 
-            // comboBoxStopBits
-            // 
-            this.comboBoxStopBits.FormattingEnabled = true;
-            this.comboBoxStopBits.Items.AddRange(new object[] {
-            "1",
-            "2",
-            "1.5"});
-            this.comboBoxStopBits.Location = new System.Drawing.Point(91, 94);
-            this.comboBoxStopBits.Name = "comboBoxStopBits";
-            this.comboBoxStopBits.Size = new System.Drawing.Size(67, 20);
-            this.comboBoxStopBits.TabIndex = 11;
-            // 
-            // label5
-            // 
-            this.label5.AutoSize = true;
-            this.label5.Location = new System.Drawing.Point(13, 97);
-            this.label5.Name = "label5";
-            this.label5.Size = new System.Drawing.Size(53, 12);
-            this.label5.TabIndex = 12;
-            this.label5.Text = "stopBits";
             // 
             // MainForm
             // 
