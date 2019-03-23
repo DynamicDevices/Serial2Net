@@ -80,6 +80,8 @@ namespace Serial2Net
                 comboBoxSerialPort.SelectedIndex = 0;
 
             comboBoxBaudRate.SelectedIndex = 7;
+            comboBoxDataBits.SelectedIndex = 0;
+            comboBoxStopBits.SelectedIndex = 0;
 
             _bAutoReconnect = checkBoxReconnect.Checked;
             _bDisplayHex = checkBoxDisplayHex.Checked;
@@ -128,13 +130,34 @@ namespace Serial2Net
             
         }
 
+        private StopBits strToStopBits(string s)
+        {
+            if (s == "1")
+            {
+                return StopBits.One;
+            }
+            if (s == "2")
+            {
+                return StopBits.Two;
+            }
+            if (s == "1.5")
+            {
+                return StopBits.OnePointFive;
+            }
+            return StopBits.None;
+        }
+
         private void ButtonStartStopClick(object sender, EventArgs e)
         {
             if (!_bIsRunning)
             {                
                 try
                 {
-                    _port = new SerialPort((string)comboBoxSerialPort.SelectedItem, int.Parse((string)comboBoxBaudRate.SelectedItem), Parity.None, 8, StopBits.One);
+                    _port = new SerialPort(comboBoxSerialPort.SelectedText,
+                        int.Parse(comboBoxBaudRate.SelectedText),
+                        Parity.None,
+                        int.Parse(comboBoxDataBits.SelectedText),
+                        strToStopBits(comboBoxStopBits.SelectedText));
                     _port.DataReceived += PortDataReceived;
                     _port.ReceivedBytesThreshold = 1;                    
                     _port.Open();
