@@ -6,15 +6,49 @@ using System.Net;
 using System.Windows.Forms;
 using System.Net.Sockets;
 using PortListener.Core.Utilities;
+using System.Collections.Generic;
 
 namespace Serial2Net
 {
+    public enum TelnetCommand : byte
+    {
+        SE = 240,               // End of subnegotiation parameters.
+        NOP = 241,              // No operation.
+        DataMark = 242,         // The data stream portion of a Synch.
+        // This should always be accompanied
+        // by a TCP Urgent notification.
+        Break = 243,            // NVT character BRK.
+        InterruptProcess = 244, // The function IP.
+        AbortOutput = 245,      // The function AO.
+        AreYouThere = 246,      // The function AYT.
+        EraseCharacter = 247,   //The function EC.
+        EraseLine = 248,        // The function EL.
+        GoAhead = 249,          // The GA signal.
+        SB = 250,               // Indicates that what follows is subnegotiation of the indicated option.
+        WILL = 251,             // Indicates the desire to begin performing, or confirmation that you are now performing, the indicated option.
+        WONT = 252,             // Indicates the refusal to perform, or continue performing, the indicated option.
+        DO = 253,               // Indicates the request that the other party perform, or confirmation that you are expecting
+        // the other party to perform, the indicated option.
+        DONT = 254,             // Indicates the demand that the other party stop performing, or confirmation that you are no
+        // longer expecting the other party to perform, the indicated option.
+        IAC = 255,              // Data Byte 255.
+    }
+
+    public enum TelnetOption : byte
+    {
+        ECHO = 1,
+        NO_GO_AHEAD = 3,
+        LINEMODE = 34,
+    }
+
     public partial class MainForm : Form
     {
         private delegate void LogHandler(string text);
 
         private TcpClient _client;
         private TcpListener _server;
+        private TcpListener ro_server;
+        private List<TcpClient> ro_clientList = new List<TcpClient>();
 
         private SerialPort _port;
         private NetworkStream _stream;
@@ -30,7 +64,7 @@ namespace Serial2Net
             SERVER,
         }
 
-        private ConnectionMode _eConnectionMode = ConnectionMode.CLIENT;
+        private ConnectionMode _eConnectionMode = ConnectionMode.SERVER;
 
         public MainForm()
         {
@@ -47,10 +81,51 @@ namespace Serial2Net
 
             comboBoxBaudRate.SelectedIndex = 7;
 
-            radioButtonClient.Checked = true;
-
             _bAutoReconnect = checkBoxReconnect.Checked;
             _bDisplayHex = checkBoxDisplayHex.Checked;
+
+            radioButtonServer_CheckedChanged_do();
+        }
+
+        private void toStop()
+        {
+            try
+            {
+                buttonStartStop.Text = @"Start";
+                _bIsRunning = false;
+
+                if (_port.IsOpen)
+                    _port.Close();
+
+                if (_client != null)
+                {
+                    if (_client.Connected)
+                        _client.Close();
+                    _client = null;
+                }
+                foreach (var c in ro_clientList)
+                {
+                    c.Close();
+                }
+                ro_clientList.Clear();
+
+                if (_server != null)
+                {
+                    _server.Stop();
+                    _server = null;
+                }
+                if (ro_server != null)
+                {
+                    ro_server.Stop();
+                    ro_server = null;
+                }
+            }
+            catch (Exception e)
+            {
+                Log("stop server exception:" + e.Message);
+                return;
+            }
+            
         }
 
         private void ButtonStartStopClick(object sender, EventArgs e)
@@ -84,6 +159,12 @@ namespace Serial2Net
                         _server = new TcpListener(IPAddress.Any, int.Parse(textBoxTargetPort.Text));
                         _server.Start();
                         _server.BeginAcceptTcpClient(TcpConnectedIn, null);
+
+                        ro_server = new TcpListener(IPAddress.Any, int.Parse(textBoxReadOnlyPort.Text));
+                        ro_server.Start();
+                        ro_server.BeginAcceptTcpClient(TcpConnectedInRO, ro_server);
+
+                        Log("Server start!");
                     }
                 }
                 catch (Exception ex)
@@ -103,45 +184,157 @@ namespace Serial2Net
             }
             else
             {
-                if (_port.IsOpen)
-                    _port.Close();
-
-                if (_client != null)
-                {
-                    if (_client.Connected)
-                        _client.Close();
-                    _client = null;
-                }
-
-                if(_server != null)
-                {
-                    _server.Stop();
-//                    _server = null;
-                }
-
-                buttonStartStop.Text = @"Start";
-                _bIsRunning = false;
+                toStop();
             }              
+        }
+
+        void TcpReaderRO(IAsyncResult ar)
+        {
+            TcpClient client = (TcpClient)ar.AsyncState;
+            NetworkStream stream = client.GetStream();
+            try
+            {
+                var numRead = stream.EndRead(ar);
+                if (numRead == 0)
+                {
+                    Log(client.Client.LocalEndPoint + " <==> " + client.Client.RemoteEndPoint + " disconnect");
+                    client.Close();
+                    ro_clientList.Remove(client);
+                    return;
+                }
+                byte[] data = new byte[1024];
+                stream.BeginRead(data, 0, data.Length, TcpReaderRO, client);
+            }
+            catch (Exception e)
+            {
+                Log(client.Client.LocalEndPoint + " <==> " + client.Client.RemoteEndPoint + " exception:" + e.Message);
+                client.Close();
+                ro_clientList.Remove(client);
+                return;
+            }
+        }
+        void TcpConnectedInRO(IAsyncResult result)
+        {
+            // Get the listener that handles the client request.
+            TcpListener listener = (TcpListener)result.AsyncState;
+            try
+            {
+                if (!_bIsRunning)
+                {
+                    Log("TcpConnectedInRO: server shutdown");
+                    goto end;
+                }
+
+                TcpClient tmp_client = listener.EndAcceptTcpClient(result);
+                NetworkStream tmp_stream = tmp_client.GetStream();
+
+                ro_clientList.Add(tmp_client);
+
+                Log("Client Connected: " + tmp_client.Client.LocalEndPoint + " <==> " + tmp_client.Client.RemoteEndPoint);
+
+                byte[] willEcho = new byte[] { (byte) TelnetCommand.IAC,
+                                           (byte) TelnetCommand.WILL,
+                                           (byte)TelnetOption.ECHO };
+                byte[] noGoAhead = new byte[] { (byte) TelnetCommand.IAC,
+                                           (byte) TelnetCommand.WILL,
+                                           (byte)TelnetOption.NO_GO_AHEAD };
+                byte[] wontLinemode = new byte[] { (byte) TelnetCommand.IAC,
+                                           (byte) TelnetCommand.WONT,
+                                           (byte)TelnetOption.LINEMODE };
+                tmp_stream.Write(willEcho, 0, willEcho.Length);
+                tmp_stream.Write(noGoAhead, 0, noGoAhead.Length);
+                tmp_stream.Write(wontLinemode, 0, wontLinemode.Length);
+
+                byte[] data = new byte[1024];
+                tmp_stream.BeginRead(data, 0, data.Length, TcpReaderRO, tmp_client);
+
+            }
+            catch (Exception e)
+            {
+                if (e is ObjectDisposedException)
+                    Log("Connection shutdown");
+                else
+                    Log("Connection exception: " + e.Message);
+            }
+
+        end:
+            try
+            {
+                if (_bIsRunning)
+                {
+                    /* accept other connection again */
+                    listener.BeginAcceptTcpClient(TcpConnectedInRO, listener);
+                }
+            }
+            catch (Exception e)
+            {
+                Log("Server exception: " + e.Message);
+                toStop();
+            }
         }
 
         void TcpConnectedIn(IAsyncResult result)
         {
             try
             {
-                _client = _server.EndAcceptTcpClient(result);
+                if (!_bIsRunning)
+                {
+                    Log("TcpConnectedIn: server shutdown");
+                    goto end;
+                }
+                TcpClient tmp_client = _server.EndAcceptTcpClient(result);
+                NetworkStream tmp_stream = tmp_client.GetStream();
 
-                _stream = _client.GetStream();
+                if (_client != null)
+                {
+                    Log("Already in use, close connected from: " + tmp_client.Client.RemoteEndPoint);
+                    byte[] reject = System.Text.Encoding.ASCII.GetBytes( "Already in use!\r\n");
+                    tmp_stream.Write(reject, 0, reject.Length);
+                    tmp_stream.Close();
+                    tmp_client.Close();
+                    goto end;
+                }
 
-                Log("Client Connected from: " + _client.Client.RemoteEndPoint);
+                _client = tmp_client;
 
-                var tcpdata = new byte[1024];
-                _stream.BeginRead(tcpdata, 0, tcpdata.Length, TcpReader, null);
+                _stream = tmp_stream;
+
+                Log("Client Connected: " + _client.Client.LocalEndPoint + "<==>" + _client.Client.RemoteEndPoint);
+
+                byte[] willEcho = new byte[] { (byte) TelnetCommand.IAC,
+                                           (byte) TelnetCommand.WILL,
+                                           (byte)TelnetOption.ECHO };
+                byte[] noGoAhead = new byte[] { (byte) TelnetCommand.IAC,
+                                           (byte) TelnetCommand.WILL,
+                                           (byte)TelnetOption.NO_GO_AHEAD };
+                byte[] wontLinemode = new byte[] { (byte) TelnetCommand.IAC,
+                                           (byte) TelnetCommand.WONT,
+                                           (byte)TelnetOption.LINEMODE };
+                _stream.Write(willEcho, 0, willEcho.Length);
+                _stream.Write(noGoAhead, 0, noGoAhead.Length);
+                _stream.Write(wontLinemode, 0, wontLinemode.Length);
+
+                _stream.BeginRead(_tcpdata, 0, _tcpdata.Length, TcpReader, null);
             } catch(Exception e)
             {
                 if(e is ObjectDisposedException)
-                    Log("Server shutdown");
+                    Log("Connection shutdown");
                 else
-                    Log("Server exception: " + e.Message);
+                    Log("Connection exception: " + e.Message);
+            }
+end:
+            try
+            {
+                if (_bIsRunning)
+                {
+                    /* accept other connection again */
+                    _server.BeginAcceptTcpClient(TcpConnectedIn, null);
+                }
+            }
+            catch (Exception e)
+            {
+                Log("Server exception: " + e.Message);
+                toStop();
             }
         }
 
@@ -186,6 +379,24 @@ namespace Serial2Net
 
             Log("S->N: " + line);
 
+            foreach (var c in ro_clientList)
+            {
+                var stream = c.GetStream();
+                if (stream.CanWrite)
+                {
+                    try
+                    {
+                        stream.Write(data, 0, rxlen);
+                    }
+                    catch (Exception ex)
+                    {
+                        Log("Write to " + c.Client.LocalEndPoint + " exception:" + ex.Message);
+                        c.Close();
+                        ro_clientList.Remove(c);
+                    }
+                }
+                
+            }
             if(_stream != null)
                 if(_stream.CanWrite)
                 {
@@ -215,8 +426,39 @@ namespace Serial2Net
                         }
                     }
                 }
-                }
+        }
 
+        private void onConnectClosed()
+        {
+            try
+            {
+                _client.Close();
+                _client = null;
+            } catch { }
+
+            if (_bAutoReconnect && _bIsRunning)
+            {
+                try
+                {
+                    if (_eConnectionMode == ConnectionMode.CLIENT)
+                    {
+                        Log("Connecting to " + textBoxIPAddress.Text + ":" + textBoxTargetPort.Text);
+
+                        _client = new TcpClient();
+
+                        _client.BeginConnect(textBoxIPAddress.Text, int.Parse(textBoxTargetPort.Text),
+                                                 TcpConnectedOut,
+                                                 null);
+                    }
+
+                }
+                catch (Exception ex)
+                {
+                    Log("Problem reconnecting:" + ex.Message);
+                }
+            }
+        }
+ 
         void TcpReader(IAsyncResult ar)
         {
             try
@@ -225,18 +467,28 @@ namespace Serial2Net
 
                 if (rxbytes > 0)
                 {
-                    _port.Write(_tcpdata, 0, rxbytes);
+                    var offset = 0;
 
-                    var line = _bDisplayHex ? StringHelper.ToHexString(_tcpdata, 0, rxbytes) : System.Text.Encoding.ASCII.GetString(_tcpdata, 0, rxbytes);
+                    while (_tcpdata[offset] == (byte)TelnetCommand.IAC)
+                    {
+                        Log("Receive client: IAC");
+                        offset += 3;
+                    }
+                    _port.Write(_tcpdata, offset, rxbytes - offset);
+
+                    var line = _bDisplayHex ? StringHelper.ToHexString(_tcpdata, offset, rxbytes - offset)
+                        : System.Text.Encoding.ASCII.GetString(_tcpdata, offset, rxbytes - offset);
                     if (line.EndsWith("\r\n"))
                         line = line.Substring(0, line.Length - 2);
 
                     Log("N->S: " + line);
+                    _stream.BeginRead(_tcpdata, 0, _tcpdata.Length, TcpReader, null);
                 }
 
-                if (rxbytes >= 0)
+                if (rxbytes == 0)
                 {
-                    _stream.BeginRead(_tcpdata, 0, _tcpdata.Length, TcpReader, null);
+                    Log("Client closed");
+                    onConnectClosed();
                 }
             } catch(Exception e)
             {
@@ -247,44 +499,7 @@ namespace Serial2Net
                 else
                     Log("Exception: " + e.Message);
 
-                try
-                {
-                    _stream.Close();
-                }
-                catch { }
-                _stream = null;
-
-                if (_bAutoReconnect && _bIsRunning)
-                {
-                    try
-                    {
-                        try
-                        {
-                            _client.Close();
-                        } catch
-                        {
-                        }
-
-                        if (_eConnectionMode == ConnectionMode.CLIENT)
-                        {
-                            Log("Connecting to " + textBoxIPAddress.Text + ":" + textBoxTargetPort.Text);
-                            
-                            _client = new TcpClient();
-
-                            _client.BeginConnect(textBoxIPAddress.Text, int.Parse(textBoxTargetPort.Text),
-                                                     TcpConnectedOut,
-                                                     null);
-                        }
-                        else
-                        {
-                            _server.BeginAcceptTcpClient(TcpConnectedIn, null);
-                        }
-
-                    } catch(Exception ex)
-                    {
-                        Log("Problem reconnecting:" + ex.Message);
-                    }
-                }
+                onConnectClosed();
             }
         }
 
@@ -325,19 +540,32 @@ namespace Serial2Net
             textBoxLog.Text = "";
         }
 
-        private void RadioButtonServerCheckedChanged(object sender, EventArgs e)
+        private void radioButtonServer_CheckedChanged_do()
         {
-
-            if(radioButtonServer.Checked)
+            if (radioButtonServer.Checked)
             {
                 _eConnectionMode = ConnectionMode.SERVER;
                 textBoxIPAddress.Enabled = false;
+                checkBoxReconnect.Enabled = false;
+                textBoxReadOnlyPort.Enabled = true;
             }
             else
             {
                 _eConnectionMode = ConnectionMode.CLIENT;
-                textBoxIPAddress.Enabled = true;                
+                textBoxIPAddress.Enabled = true;
+                checkBoxReconnect.Enabled = true;
+                textBoxReadOnlyPort.Enabled = false;
             }
+        }
+
+        private void radioButtonServer_CheckedChanged(object sender, EventArgs e)
+        {
+            radioButtonServer_CheckedChanged_do();
+        }
+
+        private void linkLabel2_LinkClicked(object sender, LinkLabelLinkClickedEventArgs e)
+        {
+            Process.Start("https://github.com/YeLincoln/Serial2Net");
         }
     }
 }
