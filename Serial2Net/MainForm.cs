@@ -58,6 +58,7 @@ namespace Serial2Net
         private bool _bAutoReconnect;
         private bool _bDisplayHex;
         private bool _bIsRunning;
+        private bool _bTelnet;
 
         private Configuration config;
 
@@ -95,37 +96,32 @@ namespace Serial2Net
                 if (config.AppSettings.Settings["SerialPort"] != null)
                 {
                     var tmp = config.AppSettings.Settings["SerialPort"].Value;
-                    if (comboBoxSerialPort.Items.Contains(tmp))
-                    {
-                        comboBoxSerialPort.SelectedIndex = comboBoxSerialPort.Items.IndexOf(tmp);
-                    }
+                    comboBoxSerialPort.SelectedIndex = comboBoxSerialPort.Items.IndexOf(tmp);
+
                 }
                 
                 if (config.AppSettings.Settings["BaudRate"] != null)
                 {
                     var tmp = config.AppSettings.Settings["BaudRate"].Value;
-                    if (comboBoxBaudRate.Items.Contains(tmp))
-                    {
-                        comboBoxBaudRate.SelectedIndex = comboBoxBaudRate.Items.IndexOf(tmp);
-                    }
+                    comboBoxBaudRate.SelectedIndex = comboBoxBaudRate.Items.IndexOf(tmp);
                 }
                 
                 if (config.AppSettings.Settings["tcpPort"] != null)
                 {
                     var tmp = config.AppSettings.Settings["tcpPort"].Value;
-                    if (tmp != null)
-                    {
-                        textBoxTargetPort.Text = tmp;
-                    }
+                    textBoxTargetPort.Text = tmp;
                 }
                 
                 if (config.AppSettings.Settings["tcpPortRO"] != null)
                 {
                     var tmp = config.AppSettings.Settings["tcpPortRO"].Value;
-                    if (tmp != null)
-                    {
-                        textBoxReadOnlyPort.Text = tmp;
-                    }
+                    textBoxReadOnlyPort.Text = tmp;
+                }
+
+                if (config.AppSettings.Settings["bTelnet"] != null)
+                {
+                    var tmp = config.AppSettings.Settings["bTelnet"].Value;
+                    checkBoxTelnet.Checked = bool.Parse(tmp);
                 }
                 
             }
@@ -134,6 +130,7 @@ namespace Serial2Net
                 Log("read config exception: " + ex.Message);
             }
 
+            _bTelnet = checkBoxTelnet.Checked;
             radioButtonServer_CheckedChanged_do();
         }
 
@@ -228,6 +225,15 @@ namespace Serial2Net
             else
             {
                 config.AppSettings.Settings["tcpPortRO"].Value = textBoxReadOnlyPort.Text;
+            }
+
+            if (config.AppSettings.Settings["bTelnet"] == null)
+            {
+                config.AppSettings.Settings.Add("bTelnet", _bTelnet.ToString());
+            }
+            else
+            {
+                config.AppSettings.Settings["bTelnet"].Value = _bTelnet.ToString();
             }
             
             config.Save(ConfigurationSaveMode.Full);
@@ -343,18 +349,20 @@ namespace Serial2Net
 
                 Log("Client Connected: " + tmp_client.Client.LocalEndPoint + " <==> " + tmp_client.Client.RemoteEndPoint);
 
-                byte[] willEcho = new byte[] { (byte) TelnetCommand.IAC,
+                if (_bTelnet) {
+                    byte[] willEcho = new byte[] { (byte) TelnetCommand.IAC,
                                            (byte) TelnetCommand.WILL,
                                            (byte)TelnetOption.ECHO };
-                byte[] noGoAhead = new byte[] { (byte) TelnetCommand.IAC,
+                    byte[] noGoAhead = new byte[] { (byte) TelnetCommand.IAC,
                                            (byte) TelnetCommand.WILL,
                                            (byte)TelnetOption.NO_GO_AHEAD };
-                byte[] wontLinemode = new byte[] { (byte) TelnetCommand.IAC,
+                    byte[] wontLinemode = new byte[] { (byte) TelnetCommand.IAC,
                                            (byte) TelnetCommand.WONT,
                                            (byte)TelnetOption.LINEMODE };
-                tmp_stream.Write(willEcho, 0, willEcho.Length);
-                tmp_stream.Write(noGoAhead, 0, noGoAhead.Length);
-                tmp_stream.Write(wontLinemode, 0, wontLinemode.Length);
+                    tmp_stream.Write(willEcho, 0, willEcho.Length);
+                    tmp_stream.Write(noGoAhead, 0, noGoAhead.Length);
+                    tmp_stream.Write(wontLinemode, 0, wontLinemode.Length);
+                }
 
                 byte[] data = new byte[1024];
                 tmp_stream.BeginRead(data, 0, data.Length, TcpReaderRO, tmp_client);
@@ -412,19 +420,21 @@ namespace Serial2Net
 
                 Log("Client Connected: " + _client.Client.LocalEndPoint + "<==>" + _client.Client.RemoteEndPoint);
 
-                byte[] willEcho = new byte[] { (byte) TelnetCommand.IAC,
+                if (_bTelnet) {
+                    byte[] willEcho = new byte[] { (byte) TelnetCommand.IAC,
                                            (byte) TelnetCommand.WILL,
                                            (byte)TelnetOption.ECHO };
-                byte[] noGoAhead = new byte[] { (byte) TelnetCommand.IAC,
+                    byte[] noGoAhead = new byte[] { (byte) TelnetCommand.IAC,
                                            (byte) TelnetCommand.WILL,
                                            (byte)TelnetOption.NO_GO_AHEAD };
-                byte[] wontLinemode = new byte[] { (byte) TelnetCommand.IAC,
+                    byte[] wontLinemode = new byte[] { (byte) TelnetCommand.IAC,
                                            (byte) TelnetCommand.WONT,
                                            (byte)TelnetOption.LINEMODE };
-                _stream.Write(willEcho, 0, willEcho.Length);
-                _stream.Write(noGoAhead, 0, noGoAhead.Length);
-                _stream.Write(wontLinemode, 0, wontLinemode.Length);
-
+                    _stream.Write(willEcho, 0, willEcho.Length);
+                    _stream.Write(noGoAhead, 0, noGoAhead.Length);
+                    _stream.Write(wontLinemode, 0, wontLinemode.Length);
+                }
+                
                 _stream.BeginRead(_tcpdata, 0, _tcpdata.Length, TcpReader, null);
             } catch(Exception e)
             {
@@ -580,11 +590,13 @@ end:
                 {
                     var offset = 0;
 
-                    while (_tcpdata[offset] == (byte)TelnetCommand.IAC)
-                    {
-                        Log("Receive client: IAC");
-                        offset += 3;
+                    if (_bTelnet) {
+                        while (_tcpdata[offset] == (byte)TelnetCommand.IAC && rxbytes >= 3) {
+                            Log("Receive IAC: " + StringHelper.ToHexString(_tcpdata, offset, 3));
+                            offset += 3;
+                        }
                     }
+
                     _port.Write(_tcpdata, offset, rxbytes - offset);
 
                     var line = _bDisplayHex ? StringHelper.ToHexString(_tcpdata, offset, rxbytes - offset)
@@ -679,5 +691,9 @@ end:
             Process.Start("https://github.com/YeLincoln/Serial2Net");
         }
 
+        private void checkBoxTelnet_CheckedChanged(object sender, EventArgs e)
+        {
+            _bTelnet = checkBoxTelnet.Checked;
+        }
     }
 }

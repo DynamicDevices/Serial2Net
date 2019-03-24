@@ -28,6 +28,7 @@
         /// </summary>
         private void InitializeComponent()
         {
+            this.components = new System.ComponentModel.Container();
             System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(MainForm));
             this.buttonStartStop = new System.Windows.Forms.Button();
             this.textBoxLog = new System.Windows.Forms.TextBox();
@@ -55,6 +56,8 @@
             this.radioButtonClient = new System.Windows.Forms.RadioButton();
             this.label3 = new System.Windows.Forms.Label();
             this.linkLabel2 = new System.Windows.Forms.LinkLabel();
+            this.checkBoxTelnet = new System.Windows.Forms.CheckBox();
+            this.toolTip1 = new System.Windows.Forms.ToolTip(this.components);
             this.groupBoxSerialPort.SuspendLayout();
             this.groupBox1.SuspendLayout();
             this.SuspendLayout();
@@ -232,6 +235,7 @@
             this.groupBox1.Controls.Add(this.textBoxTargetPort);
             this.groupBox1.Controls.Add(this.labelTargetPort);
             this.groupBox1.Controls.Add(this.textBoxIPAddress);
+            this.groupBox1.Controls.Add(this.checkBoxTelnet);
             this.groupBox1.Controls.Add(this.labelTargetIP);
             this.groupBox1.Controls.Add(this.radioButtonServer);
             this.groupBox1.Controls.Add(this.radioButtonClient);
@@ -249,6 +253,7 @@
             this.textBoxReadOnlyPort.Size = new System.Drawing.Size(100, 21);
             this.textBoxReadOnlyPort.TabIndex = 7;
             this.textBoxReadOnlyPort.Text = "6666";
+            this.toolTip1.SetToolTip(this.textBoxReadOnlyPort, "Connect to this port then you can receive data from Serial port");
             // 
             // label2
             // 
@@ -266,6 +271,8 @@
             this.textBoxTargetPort.Size = new System.Drawing.Size(100, 21);
             this.textBoxTargetPort.TabIndex = 7;
             this.textBoxTargetPort.Text = "6667";
+            this.toolTip1.SetToolTip(this.textBoxTargetPort, "Connect to this port then you can send and receive data to/from Serial port.\r\nThe" +
+        "re can only be one connection at a time.");
             // 
             // labelTargetPort
             // 
@@ -338,6 +345,26 @@
             this.linkLabel2.Text = "YeLincoln";
             this.linkLabel2.LinkClicked += new System.Windows.Forms.LinkLabelLinkClickedEventHandler(this.linkLabel2_LinkClicked);
             // 
+            // checkBoxTelnet
+            // 
+            this.checkBoxTelnet.AutoSize = true;
+            this.checkBoxTelnet.Checked = true;
+            this.checkBoxTelnet.CheckState = System.Windows.Forms.CheckState.Checked;
+            this.checkBoxTelnet.Location = new System.Drawing.Point(139, 18);
+            this.checkBoxTelnet.Name = "checkBoxTelnet";
+            this.checkBoxTelnet.Size = new System.Drawing.Size(60, 16);
+            this.checkBoxTelnet.TabIndex = 11;
+            this.checkBoxTelnet.Text = "Telnet";
+            this.toolTip1.SetToolTip(this.checkBoxTelnet, "Process client data as Telnet protocol");
+            this.checkBoxTelnet.UseVisualStyleBackColor = true;
+            this.checkBoxTelnet.CheckedChanged += new System.EventHandler(this.checkBoxTelnet_CheckedChanged);
+            // 
+            // toolTip1
+            // 
+            this.toolTip1.AutoPopDelay = 10000;
+            this.toolTip1.InitialDelay = 200;
+            this.toolTip1.ReshowDelay = 100;
+            // 
             // MainForm
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 12F);
@@ -395,6 +422,8 @@
         private System.Windows.Forms.ComboBox comboBoxDataBits;
         private System.Windows.Forms.Label label5;
         private System.Windows.Forms.ComboBox comboBoxStopBits;
+        private System.Windows.Forms.CheckBox checkBoxTelnet;
+        private System.Windows.Forms.ToolTip toolTip1;
     }
 }
 
