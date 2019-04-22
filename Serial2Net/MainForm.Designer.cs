@@ -252,7 +252,7 @@
             this.textBoxReadOnlyPort.Name = "textBoxReadOnlyPort";
             this.textBoxReadOnlyPort.Size = new System.Drawing.Size(100, 21);
             this.textBoxReadOnlyPort.TabIndex = 7;
-            this.textBoxReadOnlyPort.Text = "6666";
+            this.textBoxReadOnlyPort.Text = "8066";
             this.toolTip1.SetToolTip(this.textBoxReadOnlyPort, "Connect to this port then you can receive data from Serial port");
             // 
             // label2
@@ -270,7 +270,7 @@
             this.textBoxTargetPort.Name = "textBoxTargetPort";
             this.textBoxTargetPort.Size = new System.Drawing.Size(100, 21);
             this.textBoxTargetPort.TabIndex = 7;
-            this.textBoxTargetPort.Text = "6667";
+            this.textBoxTargetPort.Text = "8067";
             this.toolTip1.SetToolTip(this.textBoxTargetPort, "Connect to this port then you can send and receive data to/from Serial port.\r\nThe" +
         "re can only be one connection at a time.");
             // 
