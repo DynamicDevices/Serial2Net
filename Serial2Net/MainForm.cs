@@ -598,7 +598,7 @@ end:
                     }
 
                     if (_bTelnet) {
-                        while (_tcpdata[offset] == (byte)TelnetCommand.IAC && rxbytes >= 3) {
+                        while (_tcpdata[offset] == (byte)TelnetCommand.IAC && rxbytes - offset >= 3) {
                             offset += 3;
                         }
                     }
