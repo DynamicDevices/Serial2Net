@@ -59,6 +59,7 @@ namespace Serial2Net
         private bool _bDisplayHex;
         private bool _bIsRunning;
         private bool _bTelnet;
+        private bool _bLogData;
 
         private Configuration config;
 
@@ -89,6 +90,8 @@ namespace Serial2Net
 
             _bAutoReconnect = checkBoxReconnect.Checked;
             _bDisplayHex = checkBoxDisplayHex.Checked;
+            _bLogData = checkBoxLogData.Checked;
+            checkBoxDisplayHex.Enabled = checkBoxLogData.Checked;
 
             try
             {
@@ -494,11 +497,10 @@ end:
             var data = new byte[rxlen];
             _port.Read(data, 0, rxlen);
 
-            var line = _bDisplayHex ? StringHelper.ToHexString(data, 0, rxlen) : System.Text.Encoding.ASCII.GetString(data, 0, rxlen);
-            if (line.EndsWith("\r\n"))
-                line = line.Substring(0, line.Length - 2);
-
-            Log("S->N: " + line);
+            if (_bLogData) {
+                var line = _bDisplayHex ? StringHelper.ToHexString(data, 0, rxlen) : System.Text.Encoding.ASCII.GetString(data, 0, rxlen);
+                Log("S->N: " + line);
+            }
 
             foreach (var c in ro_clientList)
             {
@@ -590,21 +592,19 @@ end:
                 {
                     var offset = 0;
 
+                    if (_bLogData) {
+                        var line = _bDisplayHex ? StringHelper.ToHexString(_tcpdata, 0, rxbytes) : System.Text.Encoding.ASCII.GetString(_tcpdata, 0, rxbytes);
+                        Log("S->N: " + line);
+                    }
+
                     if (_bTelnet) {
                         while (_tcpdata[offset] == (byte)TelnetCommand.IAC && rxbytes >= 3) {
-                            Log("Receive IAC: " + StringHelper.ToHexString(_tcpdata, offset, 3));
                             offset += 3;
                         }
                     }
 
                     _port.Write(_tcpdata, offset, rxbytes - offset);
 
-                    var line = _bDisplayHex ? StringHelper.ToHexString(_tcpdata, offset, rxbytes - offset)
-                        : System.Text.Encoding.ASCII.GetString(_tcpdata, offset, rxbytes - offset);
-                    if (line.EndsWith("\r\n"))
-                        line = line.Substring(0, line.Length - 2);
-
-                    Log("N->S: " + line);
                     _stream.BeginRead(_tcpdata, 0, _tcpdata.Length, TcpReader, null);
                 }
 
@@ -694,6 +694,12 @@ end:
         private void checkBoxTelnet_CheckedChanged(object sender, EventArgs e)
         {
             _bTelnet = checkBoxTelnet.Checked;
+        }
+
+        private void checkBoxLogData_CheckedChanged(object sender, EventArgs e)
+        {
+            _bLogData = checkBoxLogData.Checked;
+            checkBoxDisplayHex.Enabled = checkBoxLogData.Checked;
         }
     }
 }
