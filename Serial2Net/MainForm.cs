@@ -498,7 +498,7 @@ end:
             _port.Read(data, 0, rxlen);
 
             if (_bLogData) {
-                var line = _bDisplayHex ? StringHelper.ToHexString(data, 0, rxlen) : System.Text.Encoding.ASCII.GetString(data, 0, rxlen);
+                var line = _bDisplayHex ? StringHelper.ToHexString(data, 0, rxlen) : System.Text.Encoding.ASCII.GetString(data, 0, rxlen).TrimEnd('\0');
                 Log("S->N: " + line);
             }
 
@@ -593,8 +593,8 @@ end:
                     var offset = 0;
 
                     if (_bLogData) {
-                        var line = _bDisplayHex ? StringHelper.ToHexString(_tcpdata, 0, rxbytes) : System.Text.Encoding.ASCII.GetString(_tcpdata, 0, rxbytes);
-                        Log("S->N: " + line);
+                        var line = _bDisplayHex ? StringHelper.ToHexString(_tcpdata, 0, rxbytes): System.Text.Encoding.ASCII.GetString(_tcpdata, 0, rxbytes).TrimEnd('\0');
+                        Log("N->S: " + line);
                     }
 
                     if (_bTelnet) {
