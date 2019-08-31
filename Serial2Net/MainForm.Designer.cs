@@ -51,13 +51,14 @@
             this.textBoxTargetPort = new System.Windows.Forms.TextBox();
             this.labelTargetPort = new System.Windows.Forms.Label();
             this.textBoxIPAddress = new System.Windows.Forms.TextBox();
+            this.checkBoxTelnet = new System.Windows.Forms.CheckBox();
             this.labelTargetIP = new System.Windows.Forms.Label();
             this.radioButtonServer = new System.Windows.Forms.RadioButton();
             this.radioButtonClient = new System.Windows.Forms.RadioButton();
             this.label3 = new System.Windows.Forms.Label();
             this.linkLabel2 = new System.Windows.Forms.LinkLabel();
-            this.checkBoxTelnet = new System.Windows.Forms.CheckBox();
             this.toolTip1 = new System.Windows.Forms.ToolTip(this.components);
+            this.checkBoxLogData = new System.Windows.Forms.CheckBox();
             this.groupBoxSerialPort.SuspendLayout();
             this.groupBox1.SuspendLayout();
             this.SuspendLayout();
@@ -107,7 +108,7 @@
             // checkBoxDisplayHex
             // 
             this.checkBoxDisplayHex.AutoSize = true;
-            this.checkBoxDisplayHex.Location = new System.Drawing.Point(462, 83);
+            this.checkBoxDisplayHex.Location = new System.Drawing.Point(462, 97);
             this.checkBoxDisplayHex.Name = "checkBoxDisplayHex";
             this.checkBoxDisplayHex.Size = new System.Drawing.Size(90, 16);
             this.checkBoxDisplayHex.TabIndex = 11;
@@ -291,6 +292,20 @@
             this.textBoxIPAddress.TabIndex = 5;
             this.textBoxIPAddress.Text = "127.0.0.1";
             // 
+            // checkBoxTelnet
+            // 
+            this.checkBoxTelnet.AutoSize = true;
+            this.checkBoxTelnet.Checked = true;
+            this.checkBoxTelnet.CheckState = System.Windows.Forms.CheckState.Checked;
+            this.checkBoxTelnet.Location = new System.Drawing.Point(139, 18);
+            this.checkBoxTelnet.Name = "checkBoxTelnet";
+            this.checkBoxTelnet.Size = new System.Drawing.Size(60, 16);
+            this.checkBoxTelnet.TabIndex = 11;
+            this.checkBoxTelnet.Text = "Telnet";
+            this.toolTip1.SetToolTip(this.checkBoxTelnet, "Process client data as Telnet protocol");
+            this.checkBoxTelnet.UseVisualStyleBackColor = true;
+            this.checkBoxTelnet.CheckedChanged += new System.EventHandler(this.checkBoxTelnet_CheckedChanged);
+            // 
             // labelTargetIP
             // 
             this.labelTargetIP.AutoSize = true;
@@ -345,25 +360,22 @@
             this.linkLabel2.Text = "YeLincoln";
             this.linkLabel2.LinkClicked += new System.Windows.Forms.LinkLabelLinkClickedEventHandler(this.linkLabel2_LinkClicked);
             // 
-            // checkBoxTelnet
-            // 
-            this.checkBoxTelnet.AutoSize = true;
-            this.checkBoxTelnet.Checked = true;
-            this.checkBoxTelnet.CheckState = System.Windows.Forms.CheckState.Checked;
-            this.checkBoxTelnet.Location = new System.Drawing.Point(139, 18);
-            this.checkBoxTelnet.Name = "checkBoxTelnet";
-            this.checkBoxTelnet.Size = new System.Drawing.Size(60, 16);
-            this.checkBoxTelnet.TabIndex = 11;
-            this.checkBoxTelnet.Text = "Telnet";
-            this.toolTip1.SetToolTip(this.checkBoxTelnet, "Process client data as Telnet protocol");
-            this.checkBoxTelnet.UseVisualStyleBackColor = true;
-            this.checkBoxTelnet.CheckedChanged += new System.EventHandler(this.checkBoxTelnet_CheckedChanged);
-            // 
             // toolTip1
             // 
             this.toolTip1.AutoPopDelay = 10000;
             this.toolTip1.InitialDelay = 200;
             this.toolTip1.ReshowDelay = 100;
+            // 
+            // checkBoxLogData
+            // 
+            this.checkBoxLogData.AutoSize = true;
+            this.checkBoxLogData.Location = new System.Drawing.Point(462, 79);
+            this.checkBoxLogData.Name = "checkBoxLogData";
+            this.checkBoxLogData.Size = new System.Drawing.Size(72, 16);
+            this.checkBoxLogData.TabIndex = 11;
+            this.checkBoxLogData.Text = "Log Data";
+            this.checkBoxLogData.UseVisualStyleBackColor = true;
+            this.checkBoxLogData.CheckedChanged += new System.EventHandler(this.checkBoxLogData_CheckedChanged);
             // 
             // MainForm
             // 
@@ -375,6 +387,7 @@
             this.Controls.Add(this.groupBox1);
             this.Controls.Add(this.groupBoxSerialPort);
             this.Controls.Add(this.buttonClear);
+            this.Controls.Add(this.checkBoxLogData);
             this.Controls.Add(this.checkBoxDisplayHex);
             this.Controls.Add(this.checkBoxReconnect);
             this.Controls.Add(this.linkLabel1);
@@ -424,6 +437,7 @@
         private System.Windows.Forms.ComboBox comboBoxStopBits;
         private System.Windows.Forms.CheckBox checkBoxTelnet;
         private System.Windows.Forms.ToolTip toolTip1;
+        private System.Windows.Forms.CheckBox checkBoxLogData;
     }
 }
 
